@@ -14,7 +14,8 @@ services:
       - "80:80"
     volumes:
       - ./config/nginx:/etc/nginx/conf.d
-      - /root/pesquisa_django_full/static:/static
-      - /root/pesquisa_django_full/media:/media
+      - /root/QuintoAndarV2/static:/static
+      - /root/QuintoAndarV2/static:/staticfiles
+      - /root/QuintoAndarV2/media:/media
     depends_on:
       - web
