@@ -70,7 +70,7 @@ def query_knowledge_base(query, pdf_index, web_index, prompt, history=[]):
     history.append({"role": "user", "content": f"Documentos:\n{combined_content}\n\nConsulta: {query}"})
     
     response = client.chat.completions.create(
-        model="gpt-4o",
+        model="gpt-4",
         messages=[{"role": "system", "content": prompt}] + history,
         max_tokens=900,
         temperature=0,
