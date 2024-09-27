@@ -1,0 +1,25 @@
+<aside id="layout-menu" class="layout-menu-horizontal menu-horizontal menu bg-menu-theme flex-grow-0">
+  <div class="container-xxl d-flex h-100">
+    <ul class="menu-inner py-1">
+      <!-- Page -->
+      <li class="menu-item {% if request.path == '/voice_assistant/1' %}active{% endif %}">
+        <a href="{% url 'index1' %}" class="menu-link">
+          <i class="menu-icon tf-icons ti ti-phone-call"></i>
+          <div>Voz 100% da chamada</div>
+        </a>
+      </li>
+      <li class="menu-item {% if request.path == '/voice_assistant/2' %}active{% endif %}">
+        <a href="{% url 'index2' %}" class="menu-link">
+          <i class="menu-icon tf-icons ti ti-keyboard"></i>
+          <div data-i18n="Nova Oportunidade">Somente Texto</div>
+        </a>
+      </li>
+      <li class="menu-item {% if request.path == '/voice_assistant/3' %}active{% endif %}">
+        <a href="{% url 'index3' %}" class="menu-link">
+          <i class="menu-icon tf-icons ti ti-phone-off"></i>
+          <div data-i18n="Configurações">Controle de Voz</div>
+        </a>
+      </li>
+    </ul>
+  </div>
+</aside>

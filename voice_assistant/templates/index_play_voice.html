@@ -1,0 +1,192 @@
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container-xxl flex-grow-1 container-p-y">
+  <div class="app-chat card overflow-hidden">
+    <!-- Chat History -->
+    <div class="col app-chat-history bg-body">
+      <div class="chat-history-wrapper">
+        <div class="chat-history-header border-bottom">
+          <div class="d-flex justify-content-between align-items-center">
+            <div class="d-flex overflow-hidden align-items-center">
+              <div class="flex-shrink-0 avatar">
+                <img src="{% static 'assets/img/avatars/2.png' %}" alt="Avatar" class="rounded-circle" data-bs-toggle="sidebar" data-overlay data-target="#app-chat-sidebar-right" />
+              </div>
+              <div class="chat-contact-info flex-grow-1 ms-2">
+                <h6 class="m-0">Atendimento Guiado - Quinto Andar</h6>
+                <!-- <small class="user-status text-muted">O atendimento guiado da Tahto!</small> -->
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="chat-history-body bg-body">
+          <ul class="list-unstyled chat-history" id="chat-content">
+            <!-- Mensagens serão adicionadas aqui -->
+          </ul>
+        </div>
+        <!-- Chat message form -->
+        <div class="chat-history-footer shadow-sm">
+          <form class="form-send-message d-flex justify-content-between align-items-center">
+              <input id="message-input" class="form-control message-input border-0 me-3 shadow-none" placeholder="" />
+              <div id="interim-display" style="display: none;"></div> <!-- Adicionado aqui -->
+              <div class="message-actions d-flex align-items-center">
+                  <button class="btn btn-success d-flex send-msg-btn" id="send-btn">
+                      <i class="ti ti-send me-md-1 me-0"></i>
+                      <span class="align-middle d-md-inline-block d-none">Enviar</span>
+                  </button>
+                  <button class="btn btn-secondary d-flex ms-2" id="toggle-voice-btn">
+                      <i class="ti ti-microphone me-md-1 me-0"></i>
+                      <span class="align-middle d-md-inline-block d-none">Voz</span>
+                  </button>
+              </div>
+          </form>
+      </div>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- /Chat History -->
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script>
+  $(document).ready(function() {
+    const chatContent = $('#chat-content');
+    const messageInput = $('#message-input');
+    const sendBtn = $('#send-btn');
+    const toggleVoiceBtn = $('#toggle-voice-btn');
+    let canSend = true;
+    let recognitionEnabled = false;
+    let recognition;
+    let silenceTimer;
+    let interimTranscript = '';
+
+    function sendMessage(message) {
+        if (message.trim() !== '') {
+            // Adiciona a mensagem do usuário no chat
+            chatContent.append(`
+                <li class="chat-message chat-message-right">
+                    <div class="d-flex overflow-hidden">
+                        <div class="chat-message-wrapper flex-grow-1">
+                            <div class="chat-message-text">
+                                <p class="mb-0">${message}</p>
+                            </div>
+                        </div>
+                        <div class="user-avatar flex-shrink-0 ms-3">
+                            <div class="avatar avatar-sm">
+                                <img src="{% static 'assets/img/avatars/1.jpeg' %}" alt="Avatar" class="rounded-circle" />
+                            </div>
+                        </div>
+                    </div>
+                </li>`);
+            messageInput.val('');
+
+            // Envia a mensagem para o backend
+            $.post('/voice_assistant/process_transcription/', { transcription: message }, function(data) {
+                if (data.response) {
+                    chatContent.append(`
+                        <li class="chat-message chat-message-left">
+                            <div class="d-flex overflow-hidden">
+                                <div class="user-avatar flex-shrink-0 me-3">
+                                    <div class="avatar avatar-sm">
+                                        <img src="{% static 'assets/img/avatars/2.png' %}" alt="Avatar" class="rounded-circle" />
+                                    </div>
+                                </div>
+                                <div class="chat-message-wrapper flex-grow-1">
+                                    <div class="chat-message-text">
+                                        <p class="mb-0">${data.response}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </li>`);
+                }
+            });
+
+            // Desabilita o envio de novas mensagens por 20 segundos
+            canSend = false;
+            sendBtn.prop('disabled', true);
+            setTimeout(function() {
+                canSend = true;
+                sendBtn.prop('disabled', false);
+            }, 20000); // 20 segundos
+        }
+    }
+
+    sendBtn.on('click', function() {
+        if (canSend) {
+            const message = messageInput.val();
+            sendMessage(message);
+        }
+    });
+
+    messageInput.on('keypress', function(event) {
+        if (event.keyCode === 13) {
+            event.preventDefault();
+            sendBtn.click();
+        }
+    });
+
+    function startRecognition() {
+        recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+        recognition.lang = 'pt-BR';
+        recognition.interimResults = true;
+        recognition.continuous = true;
+
+        recognition.onresult = function(event) {
+            clearTimeout(silenceTimer);
+            interimTranscript = ''; // Limpar a transcrição intermediária antes de começar
+
+            for (let i = event.resultIndex; i < event.results.length; ++i) {
+                if (event.results[i].isFinal) {
+                    const finalTranscript = event.results[i][0].transcript.trim();
+                    messageInput.val((messageInput.val() + ' ' + finalTranscript).trim());
+                } else {
+                    interimTranscript += event.results[i][0].transcript;
+                }
+            }
+
+            // Mostrar a transcrição intermediária sem acumulá-la no campo de entrada
+            if (interimTranscript) {
+                $('#interim-display').text(interimTranscript);
+            } else {
+                $('#interim-display').text('');
+            }
+
+            if (canSend) {
+                silenceTimer = setTimeout(() => {
+                    const message = messageInput.val().trim();
+                    if (message) {
+                        sendMessage(message);
+                    }
+                }, 500000000000000); // 5 segundos de silêncio
+            }
+        };
+
+        recognition.onerror = function(event) {
+            console.error('Speech recognition error detected: ' + event.error);
+        };
+
+        recognition.onend = function() {
+            if (recognitionEnabled) {
+                recognition.start();
+            }
+        };
+
+        recognition.start();
+    }
+
+    toggleVoiceBtn.on('click', function() {
+        recognitionEnabled = !recognitionEnabled;
+        if (recognitionEnabled) {
+            startRecognition();
+            toggleVoiceBtn.addClass('btn-danger').removeClass('btn-secondary');
+        } else {
+            if (recognition) {
+                recognition.stop();
+            }
+            toggleVoiceBtn.addClass('btn-secondary').removeClass('btn-danger');
+        }
+    });
+});
+</script>
+{% endblock %}

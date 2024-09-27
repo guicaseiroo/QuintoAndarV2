@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voice Assistant</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #f0f0f0;
+        }
+        .chat-container {
+            width: 600px;
+            max-width: 100%;
+            background: white;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            border-radius: 8px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+        .chat-messages {
+            flex-grow: 1;
+            padding: 20px;
+            height: 400px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .message {
+            display: flex;
+            justify-content: flex-start;
+            align-items: center;
+        }
+        .message.transcription {
+            justify-content: flex-start;
+        }
+        .message.response {
+            justify-content: flex-end;
+        }
+        .message-content {
+            max-width: 60%;
+            padding: 10px 15px;
+            border-radius: 20px;
+            background-color: #e0e0e0;
+        }
+        .message.transcription .message-content {
+            background-color: #d1e7dd;
+        }
+        .message.response .message-content {
+            background-color: #cfe2ff;
+        }
+        textarea {
+            width: 100%;
+            padding: 10px;
+            box-sizing: border-box;
+            border: none;
+            border-top: 1px solid #ccc;
+            resize: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="chat-container">
+        <div class="chat-messages" id="chat-messages"></div>
+        <textarea id="transcription" placeholder="" readonly></textarea>
+    </div>
+
+    <script>
+        const chatMessages = document.getElementById('chat-messages');
+        const transcriptionArea = document.getElementById('transcription');
+        let silenceTimer;
+        const silenceDuration = 2500; // 3 seconds
+
+        function displayMessage(content, type) {
+            const messageDiv = document.createElement('div');
+            messageDiv.classList.add('message', type);
+            const messageContentDiv = document.createElement('div');
+            messageContentDiv.classList.add('message-content');
+            messageContentDiv.textContent = content;
+            messageDiv.appendChild(messageContentDiv);
+            chatMessages.appendChild(messageDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        function sendTranscription() {
+            const transcription = transcriptionArea.value.trim();
+            if (transcription) {
+                displayMessage(transcription, 'transcription');
+                transcriptionArea.value = ''; // Clear the textarea after sending
+                const xhr = new XMLHttpRequest();
+                xhr.open('POST', '/voice_assistant/process_transcription/');
+                xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+                xhr.setRequestHeader('X-CSRFToken', '{{ csrf_token }}');
+                xhr.onload = function() {
+                    if (xhr.status === 200) {
+                        const response = JSON.parse(xhr.responseText).response;
+                        displayMessage(response, 'response');
+                    }
+                };
+                xhr.send('transcription=' + encodeURIComponent(transcription));
+            }
+        }
+
+        function startTranscription() {
+            const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+            recognition.continuous = true;
+            recognition.interimResults = true;
+            recognition.lang = 'pt-BR';
+
+            recognition.onresult = function(event) {
+                clearTimeout(silenceTimer);
+                let interimTranscription = '';
+                for (let i = event.resultIndex; i < event.results.length; ++i) {
+                    if (event.results[i].isFinal) {
+                        transcriptionArea.value += event.results[i][0].transcript + ' ';
+                    } else {
+                        interimTranscription += event.results[i][0].transcript;
+                    }
+                }
+                silenceTimer = setTimeout(sendTranscription, silenceDuration);
+            };
+
+            recognition.onend = function() {
+                recognition.start();
+            };
+
+            recognition.onerror = function(event) {
+                console.error("Recognition error:", event.error);
+                recognition.stop();
+                setTimeout(() => recognition.start(), 1000);
+            };
+
+            recognition.start();
+        }
+
+        startTranscription();
+    </script>
+</body>
+</html>
